@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 AI Visual Question Answering</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <h1>🤖 Visual Question Answering</h1>
+            <p class="subtitle">✨ Ask AI intelligent questions about your images ✨</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="form-section">
+                <form id="vqaForm" enctype="multipart/form-data" novalidate>
+                    <!-- Image Upload Section -->
+                    <div class="form-group">
+                        <label for="imageInput" class="label-title">📷 Upload Your Image</label>
+                        <div class="image-upload-wrapper" id="uploadArea">
+                            <input 
+                                type="file" 
+                                id="imageInput" 
+                                name="image" 
+                                accept="image/*" 
+                                required
+                                class="file-input"
+                            >
+                            <div class="upload-placeholder" id="uploadPlaceholder">
+                                <p>⬆️</p>
+                                <p><strong>Click to upload or drag & drop</strong></p>
+                                <p class="text-small">📁 JPG • PNG • GIF • BMP | Max 5 MB</p>
+                            </div>
+                        </div>
+                        <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+                            <img id="imagePreview" alt="Preview" class="image-preview">
+                            <button type="button" class="remove-image-btn" onclick="removeImage()">✕ Remove Image</button>
+                        </div>
+                    </div>
+
+                    <!-- Question Input Section -->
+                    <div class="form-group">
+                        <label for="questionInput" class="label-title">❓ Ask Your Question</label>
+                        <textarea 
+                            id="questionInput" 
+                            name="question" 
+                            placeholder="e.g., What animal is in the picture? What color is the car? What is the person doing?"
+                            required
+                            rows="3"
+                            class="textarea-input"
+                        ></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-group">
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            <span class="btn-text">✨ Get AI Answer</span>
+                            <span class="btn-loader" id="btnLoader" style="display: none;">
+                                <span class="spinner"></span> Analyzing...
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-card">
+                    <h2 class="results-title">📍 AI Response</h2>
+                    
+                    <div class="result-item">
+                        <div class="result-label">Your Question</div>
+                        <div class="result-text" id="displayedQuestion"></div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">AI Answer</div>
+                        <div class="result-text result-answer" id="displayedAnswer"></div>
+                    </div>
+
+                    <button type="button" class="new-question-btn" onclick="resetForm()">
+                        🔄 Ask Another Question
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div class="error-section" id="errorSection" style="display: none;">
+                <div class="error-card">
+                    <div class="error-title">⚠️ Error Occurred</div>
+                    <div class="error-message" id="errorMessage"></div>
+                    <button type="button" class="close-error-btn" onclick="closeError()">✕ Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>✨ Powered by BLIP AI Model | Medium-Sized Images (Max 5MB) | Made with ❤️ using Python & Flask ✨</p>
+        </div>
+    </div>
+
+    <script>
+        // Image upload wrapper reference
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+
+        // Trigger file input when clicking on upload area
+        uploadArea.addEventListener('click', function(e) {
+            if (e.target !== imageInput) {
+                imageInput.click();
+            }
+        });
+
+        // Handle file selection from input
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    imagePreview.src = event.target.result;
+                    imagePreviewContainer.style.display = 'flex';
+                    uploadPlaceholder.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+            uploadArea.style.backgroundColor = '#e8ecff';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                imageInput.files = files;
+                const event = new Event('change', { bubbles: true });
+                imageInput.dispatchEvent(event);
+            }
+        });
+
+        // Remove image function
+        function removeImage() {
+            imageInput.value = '';
+            imagePreviewContainer.style.display = 'none';
+            uploadPlaceholder.style.display = 'flex';
+        }
+
+        // Form submission
+        document.getElementById('vqaForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnLoader = document.getElementById('btnLoader');
+            
+            // Disable button and show loader
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'flex';
+            
+            // Hide previous results/errors
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Display results
+                    document.getElementById('displayedQuestion').textContent = data.question;
+                    document.getElementById('displayedAnswer').textContent = data.answer;
+                    document.getElementById('resultsSection').style.display = 'block';
+                } else {
+                    // Display error
+                    document.getElementById('errorMessage').textContent = data.answer || 'An error occurred';
+                    document.getElementById('errorSection').style.display = 'block';
+                }
+            } catch (error) {
+                // Display error
+                document.getElementById('errorMessage').textContent = 'Network error: ' + error.message;
+                document.getElementById('errorSection').style.display = 'block';
+            } finally {
+                // Re-enable button and hide loader
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        });
+
+        // Reset form function
+        function resetForm() {
+            document.getElementById('vqaForm').reset();
+            removeImage();
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'none';
+            document.getElementById('questionInput').focus();
+        }
+
+        // Close error function
+        function closeError() {
+            document.getElementById('errorSection').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
